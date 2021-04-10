@@ -11,7 +11,8 @@ class Engrane():
         self.exit_supervisor_time=0
 
     def __repr__(self):
-        return "Engrane {} entro {:6.2f}, supervision {:6.2f}, salio {:6.2f}".format(self.id, self.arrival_time,self.enter_supervisor_time, self.exit_supervisor_time)
+        return "Engrane {} entro {:6.2f}, rectificado {:6.2f}, lavado {:6.2f}, empaque {:6.2f}".format(
+            self.id, self.arrival_time, self.exit_rectificado_time, self.exit_lavado_time, self.exit_empacado_time)
 
 class Placa():
 
@@ -24,7 +25,8 @@ class Placa():
         self.exit_supervisor_time=0
 
     def __repr__(self):
-        return "Placa {} entro {:6.2f}, supervision {:6.2f}, salio {:6.2f}".format(self.id, self.arrival_time,self.enter_supervisor_time, self.exit_supervisor_time)
+        return "Placa {} entro {:6.2f}, prensa {:6.2f}, lavado {:6.2f}, empaque {:6.2f}".format(
+            self.id, self.arrival_time, self.exit_prensa_time, self.exit_lavado_time, self.exit_empacado_time)
 
 class Event():
     NEW_ENGRANE_ARRIVAL = 1
@@ -130,6 +132,7 @@ class Simulation():
         pieza_empacado_1 = ""
         pieza_empacado_2 = ""
         iteration = 0
+        prioridad_engrane=0;
         while self.events:
             iteration+=1
             event = self.next_event()
@@ -213,7 +216,7 @@ class Simulation():
                 else:
                     busy_time = np.random.uniform(5.0, 9.0) + np.random.exponential(3)
                 next_piece.enter_empacado_time = self.clock
-                self.events.append(Event(self.clock+busy_time, Event.EMPACADO_EXIT_1, next_piece))
+                self.events.append(Event(self.clock+busy_time, Event.EMPACADO_EXIT_2, next_piece))
                 self.events.sort(key=getTime)
             if self.empacado_state_2 == self.EMPTY and self.lavado_state_2 == self.FULL:
                 self.empacado_state_2 = self.BUSY
@@ -224,37 +227,63 @@ class Simulation():
                 else:
                     busy_time = np.random.uniform(5.0, 9.0) + np.random.exponential(3)
                 next_piece.enter_empacado_time = self.clock
-                self.events.append(Event(self.clock+busy_time, Event.EMPACADO_EXIT_1, next_piece))
+                self.events.append(Event(self.clock+busy_time, Event.EMPACADO_EXIT_2, next_piece))
                 self.events.sort(key=getTime)
-            if self.lavado_state_1 == self.EMPTY and self.rectificado_state == self.FULL:
+            if self.lavado_state_1 == self.EMPTY and (self.rectificado_state == self.FULL or self.prensa_state == self.FULL):
+                if self.rectificado_state == self.FULL and self.prensa_state == self.FULL:
+                    #Prioridad a la pieza con mas tiempo esperando
+                    # prioridad_engrane = pieza_rectificado.exit_rectificado_time < pieza_prensa.exit_prensa_time
+                    #Prioridad a la pieza con menos tiempo esperando
+                    prioridad_engrane = pieza_rectificado.exit_rectificado_time > pieza_prensa.exit_prensa_time
+                    #Prioridad a Engrane
+                    # prioridad_engrane = True
+                    #Prioridad a Placa
+                    # prioridad_engrane = False
+                    # Aleatoria
+                    # prioridad_engrane=np.random.choice([True,False])
+                elif self.rectificado_state == self.FULL:
+                    prioridad_engrane = True
+                else:
+                    prioridad_engrane = False
                 self.lavado_state_1 = self.BUSY
-                self.rectificado_state = self.EMPTY
-                next_piece = pieza_rectificado
-                pieza_rectificado = ""
+                if prioridad_engrane and self.rectificado_state == self.FULL:    
+                    self.rectificado_state = self.EMPTY
+                    next_piece = pieza_rectificado
+                    pieza_rectificado = ""
+                else:
+                    self.lavado_state_1 = self.BUSY
+                    self.prensa_state = self.EMPTY
+                    next_piece = pieza_prensa
+                    pieza_prensa = ""
                 busy_time = 10 + np.random.exponential(3)
                 next_piece.enter_lavado_time = self.clock
                 self.events.append(Event(self.clock+busy_time, Event.LAVADO_EXIT_1, next_piece))
                 self.events.sort(key=getTime)
-            if self.lavado_state_2 == self.EMPTY and self.rectificado_state == self.FULL:
+            if self.lavado_state_2 == self.EMPTY and (self.rectificado_state == self.FULL or self.prensa_state == self.FULL):
+                if self.rectificado_state == self.FULL and self.prensa_state == self.FULL:
+                    #Prioridad a la pieza con mas tiempo esperando
+                    # prioridad_engrane = pieza_rectificado.exit_rectificado_time < pieza_prensa.exit_prensa_time
+                    #Prioridad a la pieza con menos tiempo esperando
+                    prioridad_engrane = pieza_rectificado.exit_rectificado_time > pieza_prensa.exit_prensa_time
+                    #Prioridad a Engrane
+                    # prioridad_engrane = True
+                    #Prioridad a Placa
+                    # prioridad_engrane = False
+                    # Aleatoria
+                    # prioridad_engrane=np.random.choice([True,False])
+                elif self.rectificado_state == self.FULL:
+                    prioridad_engrane = True
+                else:
+                    prioridad_engrane = False
                 self.lavado_state_2 = self.BUSY
-                self.rectificado_state = self.EMPTY
-                next_piece = pieza_rectificado
-                busy_time = 10 + np.random.exponential(3)
-                next_piece.enter_lavado_time = self.clock
-                self.events.append(Event(self.clock+busy_time, Event.LAVADO_EXIT_2, next_piece))
-                self.events.sort(key=getTime)
-            if self.lavado_state_1 == self.EMPTY and self.prensa_state == self.FULL:
-                self.lavado_state_1 = self.BUSY
-                self.prensa_state = self.EMPTY
-                next_piece = pieza_prensa
-                busy_time = 10 + np.random.exponential(3)
-                next_piece.enter_lavado_time = self.clock
-                self.events.append(Event(self.clock+busy_time, Event.LAVADO_EXIT_1, next_piece))
-                self.events.sort(key=getTime)
-            if self.lavado_state_2 == self.EMPTY and self.prensa_state == self.FULL:
-                self.lavado_state_2 = self.BUSY
-                self.prensa_state = self.EMPTY
-                next_piece = pieza_prensa
+                if prioridad_engrane and self.rectificado_state == self.FULL:    
+                    self.rectificado_state = self.EMPTY
+                    next_piece = pieza_rectificado
+                    pieza_rectificado = ""
+                else:
+                    self.prensa_state = self.EMPTY
+                    next_piece = pieza_prensa
+                    pieza_prensa = ""
                 busy_time = 10 + np.random.exponential(3)
                 next_piece.enter_lavado_time = self.clock
                 self.events.append(Event(self.clock+busy_time, Event.LAVADO_EXIT_2, next_piece))
@@ -262,7 +291,7 @@ class Simulation():
             if self.rectificado_state == self.EMPTY and len(self.queue_engrane)>0:
                 self.rectificado_state = self.BUSY
                 next_piece = self.queue_engrane.pop(0)
-                busy_time = np.random.normal(13.0,2.0) + np.random.exponential(3)
+                busy_time = np.random.uniform(2.0,4.0) + np.random.exponential(3)
                 next_piece.enter_rectificado_time = self.clock
                 self.events.append(Event(self.clock+busy_time, Event.RECTIFICADO_EXIT, next_piece))
                 self.events.sort(key=getTime)
@@ -277,18 +306,54 @@ class Simulation():
             if self.clock > self.simulation_time:
                 break
 
-sim = Simulation(simulation_time=10000, debug=False)
+sim = Simulation(simulation_time=19200, debug=False)
 
 print("")
 sim.run()
 print("")
 
-timeinsystem_engrane = 0
-engranes=0
-for piece in sim.exits[:10]:
+timeinsystem_engrane_avg = 0
+timeinsystem_placa_avg = 0
+engranes=[]
+placas = []
+for piece in sim.exits:
     if type(piece).__name__ == "Placa":
-        timeinsystem_engrane += (piece.exit_empacado_time - piece.arrival_time)
-        engranes+=1
-    # print(piece)
-print(timeinsystem_engrane/engranes)
+        if timeinsystem_placa_avg:
+            timeinsystem_placa_avg = timeinsystem_placa_avg+((piece.exit_empacado_time - piece.arrival_time)-timeinsystem_placa_avg)/(len(placas)+1)
+        else:
+            timeinsystem_placa_avg = piece.exit_empacado_time - piece.arrival_time
+        placas.append((piece.exit_empacado_time,timeinsystem_placa_avg))
+for piece in sim.exits:
+    if type(piece).__name__ == "Engrane":
+        if timeinsystem_engrane_avg:
+            timeinsystem_engrane_avg = timeinsystem_engrane_avg+((piece.exit_empacado_time - piece.arrival_time)-timeinsystem_engrane_avg)/(len(engranes)+1)
+        else:
+            timeinsystem_engrane_avg = piece.exit_empacado_time - piece.arrival_time
+        engranes.append((piece.exit_empacado_time,timeinsystem_engrane_avg))
+
+
+print("Salieron {} engranes".format(len(engranes)))
+print("Salieron {} placas".format(len(placas)))
+print("Rechazaron {} engranes".format(len(sim.rejected_engrane)))
+print("Rechazaron {} placas".format(len(sim.rejected_placa)))
+
+#Graficas
+import numpy as np
+engranes = np.array(engranes)
+placas = np.array(placas)
+print(engranes[:10])
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots()
+ax.plot(engranes[:,0],engranes[:,1], label="Engrane")
+ax.plot(placas[:,0],placas[:,1], label="Placas")
+
+ax.set(xlabel='Tiempo (m)', ylabel='Estancia Promedio (m)',
+    title='Estancia promedio de piezas')
+legend = ax.legend( shadow=True, fontsize='x-large')
+legend.get_frame().set_facecolor('C0')
+ax.grid()
+# fig.savefig("test.png")
+plt.show()
+
 
